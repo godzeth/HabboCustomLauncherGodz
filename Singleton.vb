@@ -25,6 +25,7 @@ Public Class Singleton
     Public ClientAirVersion As String = "latest" '(can be old for osx)
     Public ClientRenderMode As String = "cpu" '(gpu for osx)
     Public ClientResolution As String = "standard"
+    Public GodzSwfPath As String = "" 'absolute path to local HabboAir.swf used by AIR_Godz mode; auto-detected if empty
 
     Public Function GetWindowsDpiScale() As Double
         Dim hdc As IntPtr = GetDC(IntPtr.Zero)
@@ -102,6 +103,9 @@ Public Class Singleton
                 If SettingName = "ClientResolution" Then
                     ClientResolution = Convert.ToString(SettingValue)
                 End If
+                If SettingName = "GodzSwfPath" Then
+                    GodzSwfPath = Convert.ToString(SettingValue)
+                End If
             Next
         End If
         XmlDocument = Nothing
@@ -114,6 +118,7 @@ Public Class Singleton
         GlobalSettings.Add("ClientAirVersion", ClientAirVersion)
         GlobalSettings.Add("ClientRenderMode", ClientRenderMode)
         GlobalSettings.Add("ClientResolution", ClientResolution)
+        GlobalSettings.Add("GodzSwfPath", GodzSwfPath)
         Using XmlWriter As New XmlTextWriter(Path.Combine(GetLauncherDownloadFolder, "GlobalSettings.xml"), Text.Encoding.UTF8)
             With XmlWriter
                 .WriteStartDocument()

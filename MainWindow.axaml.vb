@@ -51,6 +51,33 @@ Partial Public Class MainWindow : Inherits Window
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
+
+    ' AIR_Godz mode: resolve the local SWF path. If the user has set GodzSwfPath in settings, use it.
+    ' Otherwise walk up from the launcher executable looking for a sibling 'habboAirPlusGodz/HabboAir.swf'.
+    Public Function ResolveGodzSwfPath() As String
+        Dim saved = Singleton.GetCurrentInstance().GodzSwfPath
+        If Not String.IsNullOrWhiteSpace(saved) AndAlso File.Exists(saved) Then
+            Return Path.GetFullPath(saved)
+        End If
+        Dim candidateDirs As New List(Of String) From {
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "habboAirPlusGodz")),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "habboAirPlusGodz")),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "habboAirPlusGodz")),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "habboAirPlusGodz"))
+        }
+        For Each d In candidateDirs
+            Dim f = Path.Combine(d, "HabboAir.swf")
+            If File.Exists(f) Then
+                Singleton.GetCurrentInstance().GodzSwfPath = f
+                Return f
+            End If
+        Next
+        Return ""
+    End Function
+
+    Public Function IsAirGodz() As Boolean
+        Return Singleton.GetCurrentInstance().UpdateSource = "AIR_Godz"
+    End Function
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
     Private LauncherVersion = "33"
 
@@ -308,10 +335,14 @@ Partial Public Class MainWindow : Inherits Window
             Await CleanDeprecatedClients()
 
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
-            Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
-            Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
-            IO.File.Copy(OriginalXmlPath, NewXmlPath, True)
-            UpdateAirApplicationXML()
+            If Not RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+                Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
+                Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
+                If IO.File.Exists(OriginalXmlPath) Then
+                    IO.File.Copy(OriginalXmlPath, NewXmlPath, True)
+                End If
+                UpdateAirApplicationXML()
+            End If
 
             StartNewInstanceButton.Text = AppTranslator.LaunchingClient(CurrentLanguageInt)
             Dim ClientProcess As New Process
@@ -470,7 +501,7 @@ Partial Public Class MainWindow : Inherits Window
         Try
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
             Dim ClientFilePath = Path.Combine(ClientFolderPath, "ClientDownload.zip")
-            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz() Then
                 ClientFilePath = Path.Combine(ClientFolderPath, "HabboAir.swf")
             End If
             Dim DownloadingClientHint = AppTranslator.DownloadingClient(CurrentLanguageInt)
@@ -481,13 +512,22 @@ Partial Public Class MainWindow : Inherits Window
             Directory.CreateDirectory(ClientFolderPath)
 
 
-            Dim ClientUrl = CurrentClientUrls.FlashWindowsUrl
-            Dim umaka = DownloadRemoteFileAsync(ClientUrl, ClientFilePath)
-            Do Until umaka.IsCompleted
-                StartNewInstanceButton.Text = DownloadingClientHint & " (" & CurrentDownloadProgress & "%)"
-                Await Task.Delay(100)
-            Loop
-            StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
+            If IsAirGodz() Then
+                Dim GodzSwf = ResolveGodzSwfPath()
+                If GodzSwf = "" Then
+                    Throw New Exception("AIR_Godz: local SWF not found. Run build.sh in habboAirPlusGodz/ first.")
+                End If
+                Await Task.Run(Sub() File.Copy(GodzSwf, ClientFilePath, True))
+                StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
+            Else
+                Dim ClientUrl = CurrentClientUrls.FlashWindowsUrl
+                Dim umaka = DownloadRemoteFileAsync(ClientUrl, ClientFilePath)
+                Do Until umaka.IsCompleted
+                    StartNewInstanceButton.Text = DownloadingClientHint & " (" & CurrentDownloadProgress & "%)"
+                    Await Task.Delay(100)
+                Loop
+                StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
+            End If
 
 
             Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
@@ -495,7 +535,7 @@ Partial Public Class MainWindow : Inherits Window
             File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
 
 
-            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz() Then
                 Await Task.Run(Sub() CopyEmbeddedAsset(AirPlusPatchName, ClientFolderPath))
                 Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
                 File.Delete(Path.Combine(ClientFolderPath, AirPlusPatchName))
@@ -511,7 +551,11 @@ Partial Public Class MainWindow : Inherits Window
 
             UpdateAirApplicationXML()
 
-            If IO.File.ReadAllText(Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")).Contains("<extensions>") Then
+            Dim AppXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
+            If Not IO.File.Exists(AppXmlPath) AndAlso RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+                AppXmlPath = Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Resources", "META-INF", "AIR", "application.xml")
+            End If
+            If IO.File.Exists(AppXmlPath) AndAlso IO.File.ReadAllText(AppXmlPath).Contains("<extensions>") Then
                 If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                     Dim HabboAirExtensionsOSXPatchName = "HabboAirExtensionsOSXPatch.zip"
                     Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsOSXPatchName, ClientFolderPath))
@@ -528,7 +572,29 @@ Partial Public Class MainWindow : Inherits Window
 
             Dim AirCustomLicensePath = Path.Combine(ClientFolderPath, "license.txt")
             If IO.File.Exists(AirCustomLicensePath) Then
-                IO.File.Move(AirCustomLicensePath, Path.Combine(ClientFolderPath, "META-INF", "AIR", "license.txt"), True)
+                Dim LicenseDestDir = Path.Combine(ClientFolderPath, "META-INF", "AIR")
+                If Not Directory.Exists(LicenseDestDir) AndAlso RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+                    LicenseDestDir = Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Resources", "META-INF", "AIR")
+                End If
+                If Directory.Exists(LicenseDestDir) Then
+                    IO.File.Move(AirCustomLicensePath, Path.Combine(LicenseDestDir, "license.txt"), True)
+                End If
+            End If
+
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+                Dim AppBundleResources = Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Resources")
+                Dim AppDescriptorDir = Path.Combine(AppBundleResources, "META-INF", "AIR")
+                Dim AppDescriptorDest = Path.Combine(AppDescriptorDir, "application.xml")
+                If Not IO.File.Exists(AppDescriptorDest) Then
+                    Dim RootDescriptor = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
+                    If IO.File.Exists(RootDescriptor) Then
+                        Directory.CreateDirectory(AppDescriptorDir)
+                        IO.File.Copy(RootDescriptor, AppDescriptorDest, True)
+                    ElseIf IO.File.Exists(Path.Combine(AppBundleResources, "application.xml")) Then
+                        Directory.CreateDirectory(AppDescriptorDir)
+                        IO.File.Copy(Path.Combine(AppBundleResources, "application.xml"), AppDescriptorDest, True)
+                    End If
+                End If
             End If
 
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
@@ -543,6 +609,16 @@ Partial Public Class MainWindow : Inherits Window
 
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                 FixOSXClientStructure()
+                Dim AppDescriptor = Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Resources", "META-INF", "AIR", "application.xml")
+                If IO.File.Exists(AppDescriptor) Then
+                    Dim Content = IO.File.ReadAllText(AppDescriptor)
+                    If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
+                        Content = System.Text.RegularExpressions.Regex.Replace(Content, "application/(\d+\.\d+)", "application/51.3")
+                    Else
+                        Content = System.Text.RegularExpressions.Regex.Replace(Content, "application/(\d+\.\d+)", "application/50.2")
+                    End If
+                    IO.File.WriteAllText(AppDescriptor, Content)
+                End If
                 Dim ExecutableFiles As New List(Of String) From {
                     Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "DiscordRichPresence.framework", "Versions", "A", "DiscordRichPresence"),
                     Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "Adobe AIR.framework", "Versions", "1.0", "Adobe AIR"),
@@ -574,10 +650,11 @@ Partial Public Class MainWindow : Inherits Window
                     Throw New Exception("AirPlus remote client version mismatch") 'Es muy poco probable pero este error ocurre si el identificador de la version remota de airplus cambio desde que se inicio el proceso de descarga
                 End If
             End If
+            'AIR_Godz has no remote version check — the local file mtime captured at the start of UpdateClient is the source of truth.
 
             File.WriteAllText(Path.Combine(ClientFolderPath, "AIR_HASH.txt"), GetAssetHash(GetAirPatchNameForCurrentOS))
             File.WriteAllText(Path.Combine(ClientFolderPath, "VERSION.txt"), CurrentClientUrls.FlashWindowsVersion)
-            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" = False Then
+            If (Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz()) = False Then
                 AddOrUpdateInstallation(CurrentClientUrls.FlashWindowsVersion, ClientFolderPath, "air", 0)
             End If
 
@@ -651,9 +728,9 @@ Partial Public Class MainWindow : Inherits Window
     Public Sub UpdateAirApplicationXML()
         Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
         Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
+        Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
         Dim OriginalXmlVersionNumber As String
         Dim OriginalXmlExtensionsNode As XElement
-        Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
         Dim xmlDoc As New XDocument()
         If IO.File.Exists(OriginalXmlPath) Then
             xmlDoc = XDocument.Load(OriginalXmlPath)
@@ -915,6 +992,14 @@ End Try
                 End Try
                 CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & AirPlusClientLatestVersion & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
             End If
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Godz" Then
+                Dim GodzSwf = ResolveGodzSwfPath()
+                If GodzSwf = "" Then
+                    Throw New Exception("AIR_Godz mode: could not find a local HabboAir.swf. Put one at ../habboAirPlusGodz/HabboAir.swf relative to the launcher, or set GodzSwfPath in GlobalSettings.xml.")
+                End If
+                Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
+                CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
+            End If
 
             IsClientUpdated = IsClientVersionExists()
 
@@ -972,6 +1057,8 @@ End Try
         Dim ClientType = "air"
         If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
             ClientType = "airplus"
+        ElseIf Singleton.GetCurrentInstance().UpdateSource = "AIR_Godz" Then
+            ClientType = "godz"
         End If
         Return Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads", ClientType, ClientVersion)
     End Function
@@ -1045,6 +1132,8 @@ End Try
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": AIR Classic"
             Case "AIR_Plus"
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": AIR Plus"
+            Case "AIR_Godz"
+                ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": AIR Godz"
             Case Else
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": Unknown"
         End Select
@@ -1056,6 +1145,8 @@ End Try
                 Return "AIR Classic"
             Case "AIR_Plus"
                 Return "AIR Plus"
+            Case "AIR_Godz"
+                Return "AIR Godz"
             Case Else
                 Return "Unknown"
         End Select
@@ -1065,6 +1156,8 @@ End Try
         Select Case Singleton.GetCurrentInstance().UpdateSource
             Case "AIR_Official"
                 Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus"
+            Case "AIR_Plus"
+                Singleton.GetCurrentInstance().UpdateSource = "AIR_Godz"
             Case Else
                 Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
         End Select
@@ -1080,7 +1173,7 @@ End Try
             For Each ClientVersionFolder In Directory.GetDirectories(ClientsDirectory)
                 Try
                     Directory.Delete(ClientVersionFolder, True)
-                    If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" = False Then
+                    If (Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz()) = False Then
                         RemoveInstallation(New DirectoryInfo(ClientVersionFolder).Name, "air")
                     End If
                 Catch ex As Exception
@@ -1329,6 +1422,13 @@ End Try
         Dim ClientHint As String = AppTranslator.ClassicAirClientHint(CurrentLanguageInt)
         If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
             ClientHint = AppTranslator.AirPlusClientHint(CurrentLanguageInt)
+        ElseIf IsAirGodz() Then
+            Dim GodzSwf = ResolveGodzSwfPath()
+            If GodzSwf = "" Then
+                ClientHint = "AIR Godz: no local SWF found. Run habboAirPlusGodz/build.sh --init first."
+            Else
+                ClientHint = "AIR Godz: loading local SWF:" & Environment.NewLine & GodzSwf
+            End If
         End If
         MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), ClientHint)
     End Sub
