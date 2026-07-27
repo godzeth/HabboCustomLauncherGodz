@@ -1309,7 +1309,10 @@ End Try
 
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
         If Design.IsDesignMode = False Then
-            Process.GetCurrentProcess.Kill()
+            ' Environment.Exit runs finally/Using dispose chains; Process.Kill skipped them
+            ' and could truncate a SWF being written to ~/Library/.../godz/<ver>/HabboAir.swf.
+            Try : StopPipedLoginTicketListener() : Catch : End Try
+            Environment.Exit(0)
         End If
         IsFullyLoaded = False
     End Sub
