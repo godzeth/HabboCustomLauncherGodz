@@ -47,7 +47,6 @@ Partial Public Class MainWindow : Inherits Window
     Public CurrentClientUrls As JsonClientUrls
     Public CurrentDownloadProgress As Integer
     Public CurrentLanguageInt As Integer = 0
-    Private HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
@@ -119,10 +118,12 @@ Partial Public Class MainWindow : Inherits Window
 
         Singleton.GetCurrentInstance().MainWindow = Me
         If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-            If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
-                Singleton.GetCurrentInstance.ClientAirVersion = "latest"
-            Else
-                Singleton.GetCurrentInstance.ClientAirVersion = "old"
+            If Not Singleton.GetCurrentInstance().ClientAirVersionUserSet Then
+                If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
+                    Singleton.GetCurrentInstance.ClientAirVersion = "latest"
+                Else
+                    Singleton.GetCurrentInstance.ClientAirVersion = "old"
+                End If
             End If
             Singleton.GetCurrentInstance.ClientRenderMode = "gpu"
         End If
@@ -198,10 +199,10 @@ Partial Public Class MainWindow : Inherits Window
                         Using reader As New StreamReader(pipeServer)
                             Dim arguments As String = Await reader.ReadLineAsync()
                             If arguments IsNot Nothing Then
-                                If Window.IsActive = False And LoadingWindowChild Is Nothing Then
+                                If Window.IsActive = False AndAlso LoadingWindowChild Is Nothing Then
                                     Await EnsureWindowFocus(Window)
                                 End If
-                                If arguments = "main" = False Then
+                                If arguments <> "main" Then
 
                                     FakeClipboardContent = arguments
                                     'Await Clipboard.SetTextAsync(arguments)
@@ -238,7 +239,7 @@ Partial Public Class MainWindow : Inherits Window
                 Return "HabboAirWindowsPatch_x64.zip"
             End If
         End If
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) OrElse RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
             If RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
                 Return "HabboAirLinuxPatch_arm64.zip"
             Else
@@ -355,7 +356,7 @@ Partial Public Class MainWindow : Inherits Window
             Await Task.Run(Sub() ClientProcess.Start())
             Await Task.Delay(1000)
 
-            If CurrentLoginCode.IsFromFakeClipboard = False Then
+            If Not CurrentLoginCode.IsFromFakeClipboard Then
                 Await CleanRealClipboardLoginCode(False)
             End If
 
@@ -386,7 +387,7 @@ Partial Public Class MainWindow : Inherits Window
             End If
         Catch
         End Try
-        If CleanCurrentLoginCode = True Then
+        If CleanCurrentLoginCode Then
             CurrentLoginCode = Nothing
         End If
         Return Ok
@@ -500,7 +501,7 @@ Partial Public Class MainWindow : Inherits Window
         Try
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
             Dim ClientFilePath = Path.Combine(ClientFolderPath, "ClientDownload.zip")
-            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz() Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" OrElse IsAirGodz() Then
                 ClientFilePath = Path.Combine(ClientFolderPath, "HabboAir.swf")
             End If
             Dim DownloadingClientHint = AppTranslator.DownloadingClient(CurrentLanguageInt)
@@ -534,7 +535,7 @@ Partial Public Class MainWindow : Inherits Window
             File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
 
 
-            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz() Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" OrElse IsAirGodz() Then
                 Await Task.Run(Sub() CopyEmbeddedAsset(AirPlusPatchName, ClientFolderPath))
                 Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
                 File.Delete(Path.Combine(ClientFolderPath, AirPlusPatchName))
@@ -543,7 +544,7 @@ Partial Public Class MainWindow : Inherits Window
                 Await Task.Run(Sub() UnzipFile(ClientFilePath, ClientFolderPath, True, itemsToSkip))
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
                 Dim ClientSwfType = GetSwfType(Path.Combine(ClientFolderPath, "HabboAir.swf"))
-                If ClientSwfType.StartsWith("cWS") Or ClientSwfType.StartsWith("fWS") Or ClientSwfType.StartsWith("zWS") Then
+                If ClientSwfType.StartsWith("cWS") OrElse ClientSwfType.StartsWith("fWS") OrElse ClientSwfType.StartsWith("zWS") Then
                     Await Task.Run(Sub() AirSwfDecryptor.FlashCrypto.DecryptFile(Path.Combine(ClientFolderPath, "HabboAir.swf"), Path.Combine(ClientFolderPath, "HabboAir.swf"))) 'The swf is decrypted (if needed) so that it can later be edited for OSX (the user can also see/edit it)
                 End If
             End If
@@ -639,13 +640,13 @@ Partial Public Class MainWindow : Inherits Window
                         Await CodesignFileAsync(CodesignFileOrDirectory)
                     End If
                 Next
-            ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
+            ElseIf Not RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
                 Await MakeUnixExecutableAsync(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
             End If
 
             If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
                 Dim AirPlusClientLatestVersion = Await GetRemoteLastModifiedHeaderEpoch(AirPlusClientURL)
-                If CurrentClientUrls.FlashWindowsVersion = AirPlusClientLatestVersion = False Then
+                If CurrentClientUrls.FlashWindowsVersion <> AirPlusClientLatestVersion Then
                     Throw New Exception("AirPlus remote client version mismatch") 'Es muy poco probable pero este error ocurre si el identificador de la version remota de airplus cambio desde que se inicio el proceso de descarga
                 End If
             End If
@@ -653,7 +654,7 @@ Partial Public Class MainWindow : Inherits Window
 
             File.WriteAllText(Path.Combine(ClientFolderPath, "AIR_HASH.txt"), GetAssetHash(GetAirPatchNameForCurrentOS))
             File.WriteAllText(Path.Combine(ClientFolderPath, "VERSION.txt"), CurrentClientUrls.FlashWindowsVersion)
-            If (Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz()) = False Then
+            If Singleton.GetCurrentInstance().UpdateSource <> "AIR_Plus" AndAlso Not IsAirGodz() Then
                 AddOrUpdateInstallation(CurrentClientUrls.FlashWindowsVersion, ClientFolderPath, "air", 0)
             End If
 
@@ -739,7 +740,7 @@ Partial Public Class MainWindow : Inherits Window
             OriginalXmlVersionNumber = "1.0"
             OriginalXmlExtensionsNode = Nothing
         End If
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False AndAlso RuntimeInformation.IsOSPlatform(OSPlatform.OSX) = False Then
+        If Not RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso Not RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
             OriginalXmlExtensionsNode = Nothing 'In the future, AIR extensions support for Linux, if possible, should be added.
         End If
         xmlDoc = XDocument.Load(NewXmlPath)
@@ -789,34 +790,30 @@ Partial Public Class MainWindow : Inherits Window
 
 
     Public Async Function DownloadRemoteFileAsync(RemoteFileUrl As String, DownloadFilePath As String) As Task(Of String)
-        HttpClient?.Dispose()
-        HttpClient = New HttpClient()
-        HttpClient.Timeout = Timeout.InfiniteTimeSpan
         CurrentDownloadProgress = 0
-        HttpClient.DefaultRequestHeaders.Clear()
-        HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
-        Dim Response = Await HttpClient.GetAsync(RemoteFileUrl, HttpCompletionOption.ResponseHeadersRead)
-        Dim totalSize = Response.Content.Headers.ContentLength
-        Dim downloaded As Long = 0
-        Using stream = Await Response.Content.ReadAsStreamAsync()
-            Using file = New FileStream(DownloadFilePath, FileMode.Create, FileAccess.Write)
-                Dim buffer(8191) As Byte
-                Dim bytesRead As Integer
-                Do
-                    Dim readTask = stream.ReadAsync(buffer, 0, buffer.Length)
-                    If Await Task.WhenAny(readTask, Task.Delay(10000)) IsNot readTask Then
-                        Throw New TimeoutException()
-                    End If
-                    bytesRead = Await readTask
-                    If bytesRead > 0 Then
-                        Await file.WriteAsync(buffer, 0, bytesRead)
-                        downloaded += bytesRead
-                        If totalSize.HasValue Then
-                            CurrentDownloadProgress =
-                            CInt(downloaded / totalSize.Value * 100)
-                        End If
-                    End If
-                Loop While bytesRead > 0
+        Using client As New HttpClient()
+            client.Timeout = Timeout.InfiniteTimeSpan
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
+            Using cts As New CancellationTokenSource(TimeSpan.FromSeconds(30))
+                Dim Response = Await client.GetAsync(RemoteFileUrl, HttpCompletionOption.ResponseHeadersRead, cts.Token)
+                Dim totalSize = Response.Content.Headers.ContentLength
+                Dim downloaded As Long = 0
+                Using stream = Await Response.Content.ReadAsStreamAsync()
+                    Using file = New FileStream(DownloadFilePath, FileMode.Create, FileAccess.Write)
+                        Dim buffer(8191) As Byte
+                        Dim bytesRead As Integer
+                        Do
+                            bytesRead = Await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token)
+                            If bytesRead > 0 Then
+                                Await file.WriteAsync(buffer, 0, bytesRead, cts.Token)
+                                downloaded += bytesRead
+                                If totalSize.HasValue Then
+                                    CurrentDownloadProgress = CInt(downloaded / totalSize.Value * 100)
+                                End If
+                            End If
+                        Loop While bytesRead > 0
+                    End Using
+                End Using
             End Using
         End Using
         Return DownloadFilePath
@@ -832,10 +829,10 @@ Partial Public Class MainWindow : Inherits Window
 
 
     Public Async Function EnsureCurrentWindowFocus() As Task(Of Boolean)
-        If LoadingWindowChild Is Nothing And Window.IsActive = False Then
+        If LoadingWindowChild Is Nothing AndAlso Not Window.IsActive Then
             Await EnsureWindowFocus(Me)
         End If
-        If LoadingWindowChild IsNot Nothing AndAlso LoadingWindowChild.IsActive = False Then
+        If LoadingWindowChild IsNot Nothing AndAlso Not LoadingWindowChild.IsActive Then
             Await EnsureWindowFocus(LoadingWindowChild)
         End If
         Return True
@@ -846,7 +843,7 @@ Partial Public Class MainWindow : Inherits Window
             'Console.WriteLine("Trying to read real clipboard")
             Dim ClipboardText = Await GetClipboardText()
             'Console.WriteLine("Real clipboard readed")
-            If ClipboardText = Nothing And FakeClipboardContent = "" Then
+            If ClipboardText Is Nothing AndAlso FakeClipboardContent = "" Then
                 'Console.WriteLine("Clipboard (fake+real) is empty")
                 Throw New Exception("Empty clipboard login code")
                 'Return False
@@ -883,7 +880,7 @@ Partial Public Class MainWindow : Inherits Window
 
 
                 'LoginCodeButton.BackColor = Color.Parse("#165000")
-                If OldLoginTicket = ClipboardLoginCode.SSOTicket = False Then
+                If OldLoginTicket <> ClipboardLoginCode.SSOTicket Then
                     Await EnsureCurrentWindowFocus()
                     DisplayCurrentUserOnFooter()
                     StartNewInstanceButton.IsButtonDisabled = False
@@ -937,21 +934,20 @@ End Try
     End Function
 
     Public Async Function GetRemoteLastModifiedHeaderEpoch(url As String) As Task(Of String)
-        HttpClient?.Dispose()
-        HttpClient = New HttpClient()
-        HttpClient.Timeout = TimeSpan.FromSeconds(10)
-        HttpClient.DefaultRequestHeaders.Clear()
-        HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
-        Dim request As New HttpRequestMessage(HttpMethod.Head, url)
-        Dim response As HttpResponseMessage = Await HttpClient.SendAsync(request)
-        If response.Headers.Contains("x-ms-creation-time") Then
-            Dim lastmodified = response.Headers.GetValues("x-ms-creation-time").FirstOrDefault()
-            Dim dateTimeUtc As DateTime = DateTime.ParseExact(lastmodified, "ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal)
-            Dim epochTime As Long = CType((dateTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds, Long)
-            Return epochTime.ToString()
-        Else
-            Throw New Exception("Last modified header not found")
-        End If
+        Using client As New HttpClient()
+            client.Timeout = TimeSpan.FromSeconds(10)
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
+            Dim request As New HttpRequestMessage(HttpMethod.Head, url)
+            Dim response As HttpResponseMessage = Await client.SendAsync(request)
+            If response.Headers.Contains("x-ms-creation-time") Then
+                Dim lastmodified = response.Headers.GetValues("x-ms-creation-time").FirstOrDefault()
+                Dim dateTimeUtc As DateTime = DateTime.ParseExact(lastmodified, "ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal)
+                Dim epochTime As Long = CType((dateTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds, Long)
+                Return epochTime.ToString()
+            Else
+                Throw New Exception("Last modified header not found")
+            End If
+        End Using
     End Function
 
     Public Function IsClientVersionExists(Optional ClientVersion As String = "") As Boolean
@@ -1063,20 +1059,22 @@ End Try
     End Function
 
     Public Async Function GetRemoteJsonAsync(JsonUrl As String) As Task(Of String)
-        HttpClient?.Dispose()
-        HttpClient = New HttpClient()
-        HttpClient.Timeout = TimeSpan.FromSeconds(10)
-        HttpClient.DefaultRequestHeaders.Clear()
-        HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
-        Dim Response As HttpResponseMessage = Await HttpClient.GetAsync(JsonUrl)
-        If Response.IsSuccessStatusCode Then
-            Return Await Response.Content.ReadAsStringAsync()
-        Else
-            Return ""
-        End If
+        Using client As New HttpClient()
+            client.Timeout = TimeSpan.FromSeconds(10)
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
+            Dim Response As HttpResponseMessage = Await client.GetAsync(JsonUrl)
+            If Response.IsSuccessStatusCode Then
+                Return Await Response.Content.ReadAsStringAsync()
+            Else
+                Return ""
+            End If
+        End Using
     End Function
 
     Private Sub LoginCodeButton_Click(sender As Object, e As EventArgs) Handles LoginCodeButton.Click
+        ' Locale branches here are intentionally more granular than AppTranslator's {en, es} arrays:
+        ' the avatar-settings URL must match the user's Habbo hotel (8 locales), but UI strings
+        ' only translate what AppTranslator covers. Asymmetry is by design, not a bug.
         Dim HabboAvatarSettingsUrl As String = "https://www.habbo.com/settings/avatars"
         If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("pt") Then
             HabboAvatarSettingsUrl = "https://www.habbo.com.br/settings/avatars"
@@ -1111,8 +1109,8 @@ End Try
 
     Private Sub LoginCodeButton2_Click(sender As Object, e As EventArgs) Handles LoginCodeButton2.Click
         Try
-            If StartNewInstanceButton.IsButtonDisabled = False Then
-                If CurrentLoginCode.IsFromFakeClipboard = False Then
+            If Not StartNewInstanceButton.IsButtonDisabled Then
+                If Not CurrentLoginCode.IsFromFakeClipboard Then
                     CleanRealClipboardLoginCode(True)
                 Else
                     FakeClipboardContent = ""
@@ -1182,7 +1180,7 @@ End Try
             For Each ClientVersionFolder In Directory.GetDirectories(ClientsDirectory)
                 Try
                     Directory.Delete(ClientVersionFolder, True)
-                    If (Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Or IsAirGodz()) = False Then
+                    If Singleton.GetCurrentInstance().UpdateSource <> "AIR_Plus" AndAlso Not IsAirGodz() Then
                         RemoveInstallation(New DirectoryInfo(ClientVersionFolder).Name, "air")
                     End If
                 Catch ex As Exception
@@ -1225,7 +1223,7 @@ End Try
                 End Using
                 Return True
             End If
-            If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
+            If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) OrElse RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
                 AddStartMenuShortcut() 'xdg protocol association requires an start menu shortcut
                 Dim processInfo As New ProcessStartInfo("xdg-mime", "default HabboCustomLauncher.desktop x-scheme-handler/habbo") With {
                     .UseShellExecute = False,
@@ -1248,21 +1246,21 @@ End Try
                     If key.GetValue("SecureProtocols") < 2048 Then 'johnou implementation
                         key.SetValue("SecureProtocols", key.GetValue("SecureProtocols") + 2048)
                     End If
-                    If String.IsNullOrEmpty(key.GetValue("DefaultSecureProtocols")) = False Then
-                        If key.GetValue("DefaultSecureProtocols") < 2048 Then
-                            key.SetValue("DefaultSecureProtocols", key.GetValue("DefaultSecureProtocols") + 2048)
+                        If Not String.IsNullOrEmpty(key.GetValue("DefaultSecureProtocols")) Then
+                            If key.GetValue("DefaultSecureProtocols") < 2048 Then
+                                key.SetValue("DefaultSecureProtocols", key.GetValue("DefaultSecureProtocols") + 2048)
+                            End If
                         End If
-                    End If
-                End Using
-                Dim NeedExtraSteps As Boolean = False
-                Using key = Registry.LocalMachine.OpenSubKey("SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client")
-                    If key Is Nothing = False Then
-                        If (key.GetValue("DisabledByDefault") = "1") Or (key.GetValue("Enabled") = "0") Then
-                            NeedExtraSteps = True
+                    End Using
+                    Dim NeedExtraSteps As Boolean = False
+                    Using key = Registry.LocalMachine.OpenSubKey("SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client")
+                        If key IsNot Nothing Then
+                            If (key.GetValue("DisabledByDefault") = "1") OrElse (key.GetValue("Enabled") = "0") Then
+                                NeedExtraSteps = True
+                            End If
                         End If
-                    End If
-                End Using
-                If NeedExtraSteps = True Then
+                    End Using
+                    If NeedExtraSteps Then
                     If WindowsUserIsAdmin() Then
                         Using key = Registry.LocalMachine.CreateSubKey("SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client")
                             key.SetValue("DisabledByDefault", 0)
@@ -1317,7 +1315,7 @@ End Try
     End Sub
 
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
-        If Design.IsDesignMode = False Then
+        If Not Design.IsDesignMode Then
             ' Environment.Exit runs finally/Using dispose chains; Process.Kill skipped them
             ' and could truncate a SWF being written to ~/Library/.../godz/<ver>/HabboAir.swf.
             Try : StopPipedLoginTicketListener() : Catch : End Try
@@ -1410,7 +1408,7 @@ End Try
             End If
             Dim IconsPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".icons")
             Dim IconsPath2 As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "icons")
-            If isDesktop = False Then
+            If Not isDesktop Then
                 ShortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications")
             End If
             Dim shortcutContent As String =
@@ -1461,7 +1459,7 @@ End Try
     Private Async Function EnsureWindowFocus(RequestedWindow As Window) As Task(Of Boolean)
         Try
             RequestedWindow.Show() 'Quizas convendria hacer un ShowDialog(Window) especificamente para el LoadingWindow pero luego queda abierto en el background, reformar codigo! Quizas usando luego Window.Owner desde el LoadingWindow
-            If RequestedWindow.IsActive = False Then
+            If Not RequestedWindow.IsActive Then
                 RequestedWindow.WindowState = WindowState.Minimized
                 Await Task.Delay(100)
                 RequestedWindow.WindowState = WindowState.Normal
@@ -1481,7 +1479,7 @@ End Try
                     LoadingWindowChild.Close()
                     Return
                 End If
-                If StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt) AndAlso LoadingWindowClientLaunchRequested = True Then 'Client launched
+                If StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt) AndAlso LoadingWindowClientLaunchRequested Then 'Client launched
                     Process.GetCurrentProcess.Kill()
                     Return
                 End If
@@ -1500,7 +1498,7 @@ End Try
     End Sub
 
     Private Async Sub LaunchClientFromLoadingWindowWithDelay(DelaySeconds As Integer)
-        Do Until DelaySeconds = 0 Or LoadingWindowChild Is Nothing
+        Do Until DelaySeconds = 0 OrElse LoadingWindowChild Is Nothing
             LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " " & GetCurrentUpdateSourceName() & " (" & DelaySeconds & "s)" 'Generic loading
             Await Task.Delay(1000)
             DelaySeconds -= 1
@@ -1600,7 +1598,7 @@ End Try
 
         For i As Integer = installations.Count - 1 To 0 Step -1
             Dim item As JsonObject = installations(i)
-            If (item("version")?.ToString() = version Or version = "") AndAlso item("client")?.ToString() = client Then
+            If (item("version")?.ToString() = version OrElse version = "") AndAlso item("client")?.ToString() = client Then
                 installations.RemoveAt(i)
             End If
         Next
@@ -1682,7 +1680,7 @@ Public Class LoginCode
         If LoginCode Is Nothing Then
             LoginCode = ""
         End If
-        If LoginCode.StartsWith("habbo://") And LoginCode.Contains("server=") Then 'Example: habbo://hab?server=hhes&token=11111111-1111-1111-1111-111111111111-11111111.V4.LilithRainbows
+        If LoginCode.StartsWith("habbo://") AndAlso LoginCode.Contains("server=") Then 'Example: habbo://hab?server=hhes&token=11111111-1111-1111-1111-111111111111-11111111.V4.LilithRainbows
             LoginCode = LoginCode.Remove(0, LoginCode.IndexOf("?server=") + 8)
             LoginCode = LoginCode.Replace("&token=", ".")
         End If

@@ -23,6 +23,7 @@ Public Class Singleton
     Public UpdateSource As String = "AIR_Plus"
     Public CustomWindowScale As Double = 1 '(1 = 100% or autohdpi for win7/8/8.1)
     Public ClientAirVersion As String = "latest" '(can be old for osx)
+    Public ClientAirVersionUserSet As Boolean = False ' True once user explicitly chose via Settings or saved XML
     Public ClientRenderMode As String = "cpu" '(gpu for osx)
     Public ClientResolution As String = "standard"
     Public GodzSwfPath As String = "" 'absolute path to local HabboAir.swf used by AIR_Godz mode; auto-detected if empty
@@ -96,6 +97,7 @@ Public Class Singleton
                 End If
                 If SettingName = "ClientAirVersion" Then
                     ClientAirVersion = Convert.ToString(SettingValue)
+                    ClientAirVersionUserSet = True
                 End If
                 If SettingName = "ClientRenderMode" Then
                     ClientRenderMode = Convert.ToString(SettingValue)

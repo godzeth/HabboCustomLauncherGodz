@@ -72,6 +72,7 @@ Partial Public Class SettingsWindow : Inherits Window
             Else
                 Singleton.GetCurrentInstance().ClientAirVersion = "latest"
             End If
+            Singleton.GetCurrentInstance().ClientAirVersionUserSet = True
         End With
         With ClientRenderModeButton
             Singleton.GetCurrentInstance().ClientRenderMode = .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1)
