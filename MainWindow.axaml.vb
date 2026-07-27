@@ -26,6 +26,7 @@ Imports WindowsShortcutFactory
 
 Partial Public Class MainWindow : Inherits Window
     Public IsFullyLoaded As Boolean = False
+    Private _loadedTcs As New TaskCompletionSource(Of Boolean)
     Public WithEvents LoadingWindowChild As LoadingWindow
     Private LoadingWindowClientLaunchRequested As Boolean = False
     Private WithEvents Window As Window
@@ -88,6 +89,7 @@ Partial Public Class MainWindow : Inherits Window
     Private Async Sub MainWindow_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
         Await Task.Yield() 'Ensure window load
         IsFullyLoaded = True
+        _loadedTcs.TrySetResult(True)
     End Sub
 
     ' Auto-wiring does not work for VB, so do it manually
@@ -175,19 +177,15 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Public Async Sub StartFullyLoadWaiter()
-        Dim Looped = True
-        Do While Looped
-            Await Task.Delay(50)
-            If IsFullyLoaded Then
-                Looped = False
-                Exit Do
-            End If
-            If LoadingWindowChild IsNot Nothing AndAlso LoadingWindowChild.IsFullyLoaded = True Then
-                Looped = False
-                LaunchClientFromLoadingWindowWithDelay(3)
-            End If
-        Loop
-        StartRecursiveClipboardLoginCodeCheckAsync()
+        Await _loadedTcs.Task
+        If LoadingWindowChild IsNot Nothing Then
+            Do Until LoadingWindowChild.IsFullyLoaded
+                Await Task.Delay(50)
+            Loop
+            LaunchClientFromLoadingWindowWithDelay(3)
+        Else
+            StartRecursiveClipboardLoginCodeCheckAsync()
+        End If
     End Sub
 
     Public Async Sub StartPipedLoginTicketListener()

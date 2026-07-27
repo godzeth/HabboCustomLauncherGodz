@@ -3,6 +3,7 @@ Imports Avalonia.Controls
 Imports Avalonia.Input
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
+Imports Avalonia.Platform.Storage
 Partial Public Class SettingsWindow : Inherits Window
     Public IsFullyLoaded As Boolean = False
     Private WithEvents Window As Window
@@ -18,6 +19,9 @@ Partial Public Class SettingsWindow : Inherits Window
     Private WithEvents ClientResolutionButton As CustomButton
     Private WithEvents ClientRenderResetButton As CustomButton
     Private WithEvents ClientRenderHelpButton As CustomButton
+    Private WithEvents GodzSwfPathBrowseButton As CustomButton
+    Private WithEvents GodzSwfPathClearButton As CustomButton
+    Private GodzSwfPathTextBox As TextBox
     Public CurrentLanguageInt As Integer = 0
     Public CopyMessageToClipboardBusy As Boolean = False
     Public ClipboardDebugContent As String = ""
@@ -49,6 +53,9 @@ Partial Public Class SettingsWindow : Inherits Window
         ClientResolutionButton = FindNameScope().Find("ClientResolutionButton")
         ClientRenderResetButton = FindNameScope().Find("ClientRenderResetButton")
         ClientRenderHelpButton = FindNameScope().Find("ClientRenderHelpButton")
+        GodzSwfPathBrowseButton = FindNameScope().Find("GodzSwfPathBrowseButton")
+        GodzSwfPathClearButton = FindNameScope().Find("GodzSwfPathClearButton")
+        GodzSwfPathTextBox = FindNameScope().Find("GodzSwfPathTextBox")
         Singleton.GetCurrentInstance().ScaleMainGrid(Window)
         ShowSavedSettings()
     End Sub
@@ -72,6 +79,7 @@ Partial Public Class SettingsWindow : Inherits Window
         With ClientResolutionButton
             Singleton.GetCurrentInstance().ClientResolution = .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1)
         End With
+        Singleton.GetCurrentInstance().GodzSwfPath = GodzSwfPathTextBox.Text.Trim()
         Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
         Singleton.GetCurrentInstance().ScaleMainGrid(Singleton.GetCurrentInstance().MainWindow)
         Window.Close()
@@ -154,6 +162,7 @@ Partial Public Class SettingsWindow : Inherits Window
                 Case "high"
                     ClientResolutionButton.Text = "Resolution: High"
             End Select
+            GodzSwfPathTextBox.Text = .GodzSwfPath
         End With
     End Sub
 
@@ -195,5 +204,20 @@ Partial Public Class SettingsWindow : Inherits Window
                     .Text = "AIR: 51"
             End Select
         End With
+    End Sub
+
+    Private Async Sub GodzSwfPathBrowseButton_Click(sender As Object, e As EventArgs) Handles GodzSwfPathBrowseButton.Click
+        Dim files = Await StorageProvider.OpenFilePickerAsync(New FilePickerOpenOptions With {
+            .Title = "Select HabboAir.swf",
+            .AllowMultiple = False,
+            .FileTypeFilter = {New FilePickerFileType("Habbo Air SWF") With {.Patterns = {"*.swf"}}}
+        })
+        If files.Count > 0 Then
+            GodzSwfPathTextBox.Text = files(0).Path.LocalPath
+        End If
+    End Sub
+
+    Private Sub GodzSwfPathClearButton_Click(sender As Object, e As EventArgs) Handles GodzSwfPathClearButton.Click
+        GodzSwfPathTextBox.Text = ""
     End Sub
 End Class
