@@ -261,8 +261,7 @@ Partial Public Class MainWindow : Inherits Window
         Try
             Return Await Clipboard.GetTextAsync()
         Catch ex As Exception
-            'Console.WriteLine("GetClipboardText() error: " & ex.Message)
-            Return False
+            Return Nothing
         End Try
     End Function
 
@@ -483,9 +482,10 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Sub ReplaceSwfVersion(rutaArchivo As String, nuevoValorInt As Integer)
-        Dim datos As Byte() = File.ReadAllBytes(rutaArchivo)
-        datos(3) = CByte(nuevoValorInt)
-        File.WriteAllBytes(rutaArchivo, datos)
+        Using fs As New FileStream(rutaArchivo, FileMode.Open, FileAccess.Write, FileShare.None)
+            fs.Position = 3
+            fs.WriteByte(CByte(nuevoValorInt))
+        End Using
     End Sub
 
     Function GetSwfType(SwfPath As String) As String
@@ -493,7 +493,6 @@ Partial Public Class MainWindow : Inherits Window
             br.BaseStream.Seek(0, SeekOrigin.Begin)
             Return Encoding.UTF8.GetString(br.ReadBytes(4))
         End Using
-        Throw New Exception("GetSwfType failed!")
     End Function
 
 
@@ -515,7 +514,7 @@ Partial Public Class MainWindow : Inherits Window
             If IsAirGodz() Then
                 Dim GodzSwf = ResolveGodzSwfPath()
                 If GodzSwf = "" Then
-                    Throw New Exception("AIR_Godz: local SWF not found. Run build.sh in habboAirPlusGodz/ first.")
+                    Throw New Exception("AIR Godz: local HabboAir.swf not found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh. Or set GodzSwfPath in GlobalSettings.xml.")
                 End If
                 Await Task.Run(Sub() File.Copy(GodzSwf, ClientFilePath, True))
                 StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
@@ -826,7 +825,7 @@ Partial Public Class MainWindow : Inherits Window
     Private Async Sub StartRecursiveClipboardLoginCodeCheckAsync()
         Await CheckClipboardLoginCodeAsync()
         Do While True
-            Await Task.Delay(500)
+            Await Task.Delay(2000)
             Await CheckClipboardLoginCodeAsync()
         Loop
     End Sub
@@ -995,7 +994,7 @@ End Try
             If Singleton.GetCurrentInstance().UpdateSource = "AIR_Godz" Then
                 Dim GodzSwf = ResolveGodzSwfPath()
                 If GodzSwf = "" Then
-                    Throw New Exception("AIR_Godz mode: could not find a local HabboAir.swf. Put one at ../habboAirPlusGodz/HabboAir.swf relative to the launcher, or set GodzSwfPath in GlobalSettings.xml.")
+                    Throw New Exception("AIR Godz: local HabboAir.swf not found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh. Or set GodzSwfPath in GlobalSettings.xml.")
                 End If
                 Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
                 CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
@@ -1428,7 +1427,7 @@ End Try
         ElseIf IsAirGodz() Then
             Dim GodzSwf = ResolveGodzSwfPath()
             If GodzSwf = "" Then
-                ClientHint = "AIR Godz: no local SWF found. Run habboAirPlusGodz/build.sh --init first."
+                ClientHint = "AIR Godz: local HabboAir.swf not found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh. Or set GodzSwfPath in GlobalSettings.xml."
             Else
                 ClientHint = "AIR Godz: loading local SWF:" & Environment.NewLine & GodzSwf
             End If
