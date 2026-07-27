@@ -94,27 +94,10 @@ Partial Public Class LoadingWindow : Inherits Window
             Await Task.Delay(5000)
             Environment.Exit(0)
 
-
-
-            If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
-                MakeUnixExecutable(PreviousLauncherPath)
-            End If
-            Process.Start(PreviousLauncherPath)
-            Environment.Exit(0)
         Catch
             StatusLabel.Text = LauncherUpdaterTranslator.UpdateError(CurrentLanguageInt)
         End Try
     End Sub
-
-    Function MakeUnixExecutable(ByVal filePath As String) As Boolean
-        Dim process As New Process()
-        process.StartInfo.FileName = "chmod"
-        process.StartInfo.Arguments = $"+x ""{filePath}"""
-        process.StartInfo.UseShellExecute = False
-        process.StartInfo.CreateNoWindow = True
-        process.Start()
-        process.WaitForExit()
-    End Function
 
     Async Sub ReemplazarCuandoSeLibere(archivoNuevo As String, archivoViejo As String)
 

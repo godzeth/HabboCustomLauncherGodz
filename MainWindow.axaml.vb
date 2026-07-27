@@ -413,25 +413,27 @@ Partial Public Class MainWindow : Inherits Window
         Return True
     End Function
 
-    Function MakeUnixExecutable(ByVal filePath As String) As Boolean
-        Dim process As New Process()
-        process.StartInfo.FileName = "chmod"
-        process.StartInfo.Arguments = $"+x ""{filePath}"""
-        process.StartInfo.UseShellExecute = False
-        process.StartInfo.CreateNoWindow = True
-        process.Start()
-        process.WaitForExit()
+    Public Async Function MakeUnixExecutableAsync(ByVal filePath As String) As Task
+        Using process As New Process()
+            process.StartInfo.FileName = "chmod"
+            process.StartInfo.Arguments = $"+x ""{filePath}"""
+            process.StartInfo.UseShellExecute = False
+            process.StartInfo.CreateNoWindow = True
+            process.Start()
+            Await process.WaitForExitAsync()
+        End Using
     End Function
 
-    Sub CodesignFile(filePath As String)
-        Dim p As New Process()
-        p.StartInfo.FileName = "/usr/bin/codesign"
-        p.StartInfo.Arguments = $"--force --timestamp=none --sign - ""{filePath}"""
-        p.StartInfo.UseShellExecute = False
-        p.StartInfo.CreateNoWindow = True
-        p.Start()
-        p.WaitForExit()
-    End Sub
+    Public Async Function CodesignFileAsync(filePath As String) As Task
+        Using p As New Process()
+            p.StartInfo.FileName = "/usr/bin/codesign"
+            p.StartInfo.Arguments = $"--force --timestamp=none --sign - ""{filePath}"""
+            p.StartInfo.UseShellExecute = False
+            p.StartInfo.CreateNoWindow = True
+            p.Start()
+            Await p.WaitForExitAsync()
+        End Using
+    End Function
 
     Public Sub UnzipFile(sourcezip As String, destinationfolder As String, overwrite As Boolean, Optional itemsToSkip As List(Of String) = Nothing, Optional IgnoreIOExceptions As Boolean = False)
         Dim basePath As String = Path.GetFullPath(destinationfolder)
@@ -625,7 +627,7 @@ Partial Public Class MainWindow : Inherits Window
                 }
                 For Each ExecutableFile In ExecutableFiles
                     If File.Exists(ExecutableFile) Then
-                        MakeUnixExecutable(ExecutableFile)
+                        Await MakeUnixExecutableAsync(ExecutableFile)
                     End If
                 Next
                 Dim CodesignFilesOrDirectories As New List(Of String) From {
@@ -636,11 +638,11 @@ Partial Public Class MainWindow : Inherits Window
                 }
                 For Each CodesignFileOrDirectory In CodesignFilesOrDirectories
                     If File.Exists(CodesignFileOrDirectory) OrElse Directory.Exists(CodesignFileOrDirectory) Then
-                        CodesignFile(CodesignFileOrDirectory)
+                        Await CodesignFileAsync(CodesignFileOrDirectory)
                     End If
                 Next
             ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
-                MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
+                Await MakeUnixExecutableAsync(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
             End If
 
             If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
@@ -1343,19 +1345,19 @@ End Try
         HabboLogoButton.ContextMenu.Open()
     End Sub
 
-    Private Sub AddDesktopShortcut()
-        CreateShortcut(Environment.ProcessPath, "HabboCustomLauncher", True)
+    Private Async Sub AddDesktopShortcut()
+        Await CreateShortcutAsync(Environment.ProcessPath, "HabboCustomLauncher", True)
     End Sub
 
-    Private Sub AddStartMenuShortcut()
-        CreateShortcut(Environment.ProcessPath, "HabboCustomLauncher", False)
+    Private Async Sub AddStartMenuShortcut()
+        Await CreateShortcutAsync(Environment.ProcessPath, "HabboCustomLauncher", False)
     End Sub
 
     Sub ToggleAutomaticHabboProtocol()
         'TODO
     End Sub
 
-    Sub CreateShortcut(appPath As String, appName As String, isDesktop As Boolean)
+    Async Function CreateShortcutAsync(appPath As String, appName As String, isDesktop As Boolean) As Task
         If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
             Using shortcut = New WindowsShortcut With {.Path = appPath}
                 If isDesktop Then
@@ -1382,14 +1384,15 @@ End Try
             End If
             File.WriteAllText(scriptPath, originalScriptContent, New Text.UTF8Encoding(False))
 
-            MakeUnixExecutable(scriptPath)
-            Dim process As New Process()
-            process.StartInfo.FileName = "/bin/bash"
-            process.StartInfo.Arguments = "-c """"" & scriptPath & """"""
-            process.StartInfo.UseShellExecute = False
-            process.StartInfo.CreateNoWindow = True
-            process.Start()
-            process.WaitForExit()
+            Await MakeUnixExecutableAsync(scriptPath)
+            Using process As New Process()
+                process.StartInfo.FileName = "/bin/bash"
+                process.StartInfo.Arguments = "-c """"" & scriptPath & """"""
+                process.StartInfo.UseShellExecute = False
+                process.StartInfo.CreateNoWindow = True
+                process.Start()
+                Await process.WaitForExitAsync()
+            End Using
             File.Delete(Path.Combine(OSXDownloadFolder, "HabboCustomLauncherShortcut.sh"))
 
         Else 'Linux
@@ -1416,9 +1419,9 @@ End Try
             CopyEmbeddedAsset("HabboCustomLauncherIcon.png", IconsPath)
             CopyEmbeddedAsset("HabboCustomLauncherIcon.png", IconsPath2)
             File.WriteAllText(Path.Combine(ShortcutPath, appName & ".desktop"), shortcutContent)
-            MakeUnixExecutable(Path.Combine(ShortcutPath, appName & ".desktop"))
+            Await MakeUnixExecutableAsync(Path.Combine(ShortcutPath, appName & ".desktop"))
         End If
-    End Sub
+    End Function
 
     Private Sub ChangeUpdateSourceButton2_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton2.Click
         Dim ClientHint As String = AppTranslator.ClassicAirClientHint(CurrentLanguageInt)
