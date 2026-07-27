@@ -392,14 +392,14 @@ Partial Public Class MainWindow : Inherits Window
         Return Ok
     End Function
 
-    Public Async Function MsgBox(Title As String, Message As String, Optional ClipboardDebugContent As String = "") As Task(Of Boolean)
+    Public Async Function MsgBox(Title As String, Message As String, Optional ClipboardDebugContent As String = "", Optional OkText As String = "OK") As Task(Of Boolean)
         Dim ErrorDialog As New MessageBox()
-        ErrorDialog.ConfigureContent(Title, Message, ClipboardDebugContent)
+        ErrorDialog.ConfigureContent(Title, Message, ClipboardDebugContent, OkText)
         Do While Window.IsVisible = False
             Await Task.Delay(100)
         Loop
         Await ErrorDialog.ShowDialog(Window)
-        Return True
+        Return ErrorDialog.Result
     End Function
 
     Public Async Function OpenSettingsDialog() As Task(Of Boolean)
@@ -1151,21 +1151,31 @@ End Try
         End Select
     End Function
 
-    Private Sub ChangeUpdateSourceButton_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton.Click
+    Private Async Sub ChangeUpdateSourceButton_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton.Click
         Select Case Singleton.GetCurrentInstance().UpdateSource
             Case "AIR_Official"
                 Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus"
             Case "AIR_Plus"
-                Singleton.GetCurrentInstance().UpdateSource = "AIR_Godz"
+                If ResolveGodzSwfPath() <> "" Then
+                    Singleton.GetCurrentInstance().UpdateSource = "AIR_Godz"
+                Else
+                    Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
+                    MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt),
+                           "AIR Godz skipped: no local HabboAir.swf found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh")
+                    Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
+                    RefreshUpdateSourceText()
+                    Return
+                End If
             Case Else
                 Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
         End Select
         Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
         RefreshUpdateSourceText()
-        'UpdateClientButtonStatus()
     End Sub
 
-    Private Sub StartNewInstanceButton2_Click(sender As Object, e As EventArgs) Handles StartNewInstanceButton2.Click
+    Private Async Sub StartNewInstanceButton2_Click(sender As Object, e As EventArgs) Handles StartNewInstanceButton2.Click
+        Dim confirmed As Boolean = Await MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), "Delete ALL installed clients? This cannot be undone.", "", "Delete")
+        If Not confirmed Then Return
         Dim ErrorsList As New List(Of String)
         Try
             Dim ClientsDirectory = GetPossibleClientPath("")

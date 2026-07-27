@@ -5,6 +5,7 @@ Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Partial Public Class MessageBox : Inherits Window
     Public IsFullyLoaded As Boolean = False
+    Public Result As Boolean = False
     Private WithEvents Window As Window
     Private WithEvents TitleBarLabel As Label
     Public WithEvents MessageLabel As TextBlock
@@ -36,7 +37,7 @@ Partial Public Class MessageBox : Inherits Window
         Singleton.GetCurrentInstance().ScaleMainGrid(Window)
     End Sub
 
-    Sub ConfigureContent(Title As String, Message As String, Optional ClipboardDebugContent As String = "")
+    Sub ConfigureContent(Title As String, Message As String, Optional ClipboardDebugContent As String = "", Optional OkText As String = "OK")
         If ClipboardDebugContent = "" Then
             Me.ClipboardDebugContent = Message
         Else
@@ -48,6 +49,7 @@ Partial Public Class MessageBox : Inherits Window
             TitleBarLabel.Content = "    " & Title
         End If
         MessageLabel.Text = Message
+        OkButton.Text = OkText
         AutoAdjustMessageFontSize()
     End Sub
 
@@ -67,6 +69,7 @@ Partial Public Class MessageBox : Inherits Window
     End Sub
 
     Private Sub OkButton_Click(sender As Object, e As EventArgs) Handles OkButton.Click
+        Result = True
         Window.Close()
     End Sub
 
