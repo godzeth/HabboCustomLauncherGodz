@@ -91,8 +91,6 @@ Public Class Singleton
                 Dim SettingName = SavedRequestedItem.Attributes("Name").Value
                 Dim SettingValue = SavedRequestedItem.Attributes("Value").Value
                 If SettingName = "UpdateSource" Then
-                    ' Migrate legacy mode label: AIR_Godz -> GodzMode
-                    If Convert.ToString(SettingValue) = "AIR_Godz" Then SettingValue = "GodzMode"
                     UpdateSource = Convert.ToString(SettingValue)
                 End If
                 If SettingName = "CustomWindowScale" Then
