@@ -22,7 +22,7 @@ Partial Public Class SettingsWindow : Inherits Window
     Private WithEvents GodzSwfPathBrowseButton As CustomButton
     Private WithEvents GodzSwfPathClearButton As CustomButton
     Private GodzSwfPathTextBox As TextBox
-    Private GodzModePlusCheckBox As CheckBox
+    Private WithEvents GodzModePlusButton As CustomButton
     Public CurrentLanguageInt As Integer = 0
     Public CopyMessageToClipboardBusy As Boolean = False
     Public ClipboardDebugContent As String = ""
@@ -57,7 +57,7 @@ Partial Public Class SettingsWindow : Inherits Window
         GodzSwfPathBrowseButton = FindNameScope().Find("GodzSwfPathBrowseButton")
         GodzSwfPathClearButton = FindNameScope().Find("GodzSwfPathClearButton")
         GodzSwfPathTextBox = FindNameScope().Find("GodzSwfPathTextBox")
-        GodzModePlusCheckBox = FindNameScope().Find("GodzModePlusCheckBox")
+        GodzModePlusButton = FindNameScope().Find("GodzModePlusButton")
         Singleton.GetCurrentInstance().ScaleMainGrid(Window)
         ShowSavedSettings()
     End Sub
@@ -83,7 +83,7 @@ Partial Public Class SettingsWindow : Inherits Window
             Singleton.GetCurrentInstance().ClientResolution = .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1)
         End With
         Singleton.GetCurrentInstance().GodzSwfPath = GodzSwfPathTextBox.Text.Trim()
-        Singleton.GetCurrentInstance().GodzModePlusEnabled = If(GodzModePlusCheckBox.IsChecked, False)
+        Singleton.GetCurrentInstance().GodzModePlusEnabled = GodzModePlusButton.Text.Contains("On")
         Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
         Singleton.GetCurrentInstance().ScaleMainGrid(Singleton.GetCurrentInstance().MainWindow)
         Window.Close()
@@ -167,7 +167,7 @@ Partial Public Class SettingsWindow : Inherits Window
                     ClientResolutionButton.Text = "Resolution: High"
             End Select
             GodzSwfPathTextBox.Text = .GodzSwfPath
-            GodzModePlusCheckBox.IsChecked = .GodzModePlusEnabled
+            GodzModePlusButton.Text = If(.GodzModePlusEnabled, "GodzMode+: On", "GodzMode+: Off")
         End With
     End Sub
 
@@ -180,6 +180,14 @@ Partial Public Class SettingsWindow : Inherits Window
                     .Text = "Resolution: Standard"
             End Select
         End With
+    End Sub
+
+    Private Sub GodzModePlusButton_Click(sender As Object, e As EventArgs) Handles GodzModePlusButton.Click
+        If GodzModePlusButton.Text.Contains("On") Then
+            GodzModePlusButton.Text = "GodzMode+: Off"
+        Else
+            GodzModePlusButton.Text = "GodzMode+: On"
+        End If
     End Sub
 
     Private Sub LauncherScalingResetButton_Click(sender As Object, e As EventArgs) Handles LauncherScalingResetButton.Click

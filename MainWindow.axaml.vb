@@ -1165,7 +1165,7 @@ End Try
             Case "GodzMode"
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": GodzMode"
             Case "GodzModePlus"
-                ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": GodzModePlus"
+                ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": GodzMode+"
             Case Else
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": Unknown"
         End Select
@@ -1180,7 +1180,7 @@ End Try
             Case "GodzMode"
                 Return "GodzMode"
             Case "GodzModePlus"
-                Return "GodzModePlus"
+                Return "GodzMode+"
             Case Else
                 Return "Unknown"
         End Select
