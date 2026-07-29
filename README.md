@@ -1,7 +1,6 @@
-# HabboCustomLauncher
+# Godz Custom Launcher
 
-<img width="482" alt="image" src="https://github.com/user-attachments/assets/86a47002-fe6b-4a37-8b47-b0189526ac05" />
-<br><br>
+A custom launcher for Habbo Air with **GodzMode** and **GodzModePlus** update sources.
 
 | OS                  | Classic client | App shortcut | App protocol |
 |---------------------|----------------|--------------|--------------|
@@ -9,6 +8,15 @@
 | Linux (glibc 2.33+) | ✅              | ✅            | ✅ (partial)  |
 | OSX (10.12+)        | ✅              | ✅            | ❌            |
 
-Looking for the download page? ⬇️
+## Download
 
-https://github.com/LilithRainbows/HabboCustomLauncher/releases/latest
+⬇️ <https://github.com/godzeth/HabboCustomLauncherGodz/releases/latest>
+
+## Update sources
+
+Cycle the update source in the launcher to switch client variants:
+
+- **AIR Classic** — official upstream client.
+- **AIR Plus** — Plus variant from [LilithRainbows/HabboAirPlus](https://github.com/LilithRainbows/HabboAirPlus).
+- **GodzMode** — public Godz SWF, from [godzeth/HabboAirGodzMode](https://github.com/godzeth/HabboAirGodzMode).
+- **GodzModePlus** — private Godz SWF (gated; not activated by default).
