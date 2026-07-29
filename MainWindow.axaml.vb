@@ -527,7 +527,7 @@ Partial Public Class MainWindow : Inherits Window
                     ' Fallback: copy a locally-built SWF (offline, or private repo without auth).
                     Dim GodzSwf = ResolveGodzSwfPath()
                     If GodzSwf = "" Then
-                        Throw New Exception("GodzMode: remote SWF unavailable and no local HabboAir.swf found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml.")
+                        Throw New Exception("GodzMode: SWF unavailable. Check your network connection or set GodzSwfPath in GlobalSettings.xml.")
                     End If
                     Await Task.Run(Sub() File.Copy(GodzSwf, ClientFilePath, True))
                 End If
@@ -1009,7 +1009,7 @@ End Try
                     ' Offline / no network -> fall back to a locally-built SWF.
                     Dim GodzSwf = ResolveGodzSwfPath()
                     If GodzSwf = "" Then
-                        Throw New Exception("GodzMode: remote SWF unavailable and no local HabboAir.swf found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml.")
+                        Throw New Exception("GodzMode: SWF unavailable. Check your network connection or set GodzSwfPath in GlobalSettings.xml.")
                     End If
                     Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
                     CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
@@ -1473,10 +1473,6 @@ End Try
         ElseIf IsAirGodz() Then
             Dim GodzUrl = If(Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus", GodzModePlusURL, GodzModePublicURL)
             ClientHint = GetCurrentUpdateSourceName() & ": fetching SWF from " & GodzUrl
-            Dim GodzSwf = ResolveGodzSwfPath()
-            If GodzSwf <> "" Then
-                ClientHint &= Environment.NewLine & "(local fallback available: " & GodzSwf & ")"
-            End If
         End If
         MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), ClientHint)
     End Sub
