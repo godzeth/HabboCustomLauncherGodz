@@ -26,7 +26,7 @@ Public Class Singleton
     Public ClientAirVersionUserSet As Boolean = False ' True once user explicitly chose via Settings or saved XML
     Public ClientRenderMode As String = "cpu" '(gpu for osx)
     Public ClientResolution As String = "standard"
-    Public GodzSwfPath As String = "" 'absolute path to local HabboAir.swf used by AIR_Godz mode; auto-detected if empty
+    Public GodzSwfPath As String = "" 'absolute path to local HabboAir.swf used by GodzMode mode; auto-detected if empty
 
     Public Function GetWindowsDpiScale() As Double
         Dim hdc As IntPtr = GetDC(IntPtr.Zero)
@@ -90,6 +90,8 @@ Public Class Singleton
                 Dim SettingName = SavedRequestedItem.Attributes("Name").Value
                 Dim SettingValue = SavedRequestedItem.Attributes("Value").Value
                 If SettingName = "UpdateSource" Then
+                    ' Migrate legacy mode label: AIR_Godz -> GodzMode
+                    If Convert.ToString(SettingValue) = "AIR_Godz" Then SettingValue = "GodzMode"
                     UpdateSource = Convert.ToString(SettingValue)
                 End If
                 If SettingName = "CustomWindowScale" Then
