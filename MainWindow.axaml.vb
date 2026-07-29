@@ -51,6 +51,8 @@ Partial Public Class MainWindow : Inherits Window
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
+    Public GodzModePublicURL = "https://github.com/godzeth/HabboAirGodzMode/releases/latest/download/HabboAir.swf"
+    Public GodzModePlusURL = "https://github.com/godzeth/HabboAirGodzModePlus/releases/latest/download/HabboAir.swf"
 
     ' GodzMode mode: resolve the local SWF path. If the user has set GodzSwfPath in settings, use it.
     ' Otherwise walk up from the launcher executable looking for a sibling 'habboAirPlusGodz/HabboAir.swf'.
@@ -76,7 +78,7 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Public Function IsAirGodz() As Boolean
-        Return Singleton.GetCurrentInstance().UpdateSource = "GodzMode"
+        Return Singleton.GetCurrentInstance().UpdateSource = "GodzMode" OrElse Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus"
     End Function
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
     Private LauncherVersion = "33"
@@ -513,11 +515,22 @@ Partial Public Class MainWindow : Inherits Window
 
 
             If IsAirGodz() Then
-                Dim GodzSwf = ResolveGodzSwfPath()
-                If GodzSwf = "" Then
-                    Throw New Exception("GodzMode: local HabboAir.swf not found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml.")
+                Dim GodzUrl = CurrentClientUrls.FlashWindowsUrl
+                If GodzUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) Then
+                    ' HTTP download (public GodzMode; GodzModePlus over the private repo needs auth).
+                    Dim umaka = DownloadRemoteFileAsync(GodzUrl, ClientFilePath)
+                    Do Until umaka.IsCompleted
+                        StartNewInstanceButton.Text = DownloadingClientHint & " (" & CurrentDownloadProgress & "%)"
+                        Await Task.Delay(100)
+                    Loop
+                Else
+                    ' Fallback: copy a locally-built SWF (offline, or private repo without auth).
+                    Dim GodzSwf = ResolveGodzSwfPath()
+                    If GodzSwf = "" Then
+                        Throw New Exception("GodzMode: remote SWF unavailable and no local HabboAir.swf found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml.")
+                    End If
+                    Await Task.Run(Sub() File.Copy(GodzSwf, ClientFilePath, True))
                 End If
-                Await Task.Run(Sub() File.Copy(GodzSwf, ClientFilePath, True))
                 StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
             Else
                 Dim ClientUrl = CurrentClientUrls.FlashWindowsUrl
@@ -987,13 +1000,22 @@ End Try
                 End Try
                 CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & AirPlusClientLatestVersion & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
             End If
-            If Singleton.GetCurrentInstance().UpdateSource = "GodzMode" Then
-                Dim GodzSwf = ResolveGodzSwfPath()
-                If GodzSwf = "" Then
-                    Throw New Exception("GodzMode: local HabboAir.swf not found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml.")
-                End If
-                Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
-                CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
+            If Singleton.GetCurrentInstance().UpdateSource = "GodzMode" OrElse Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus" Then
+                Dim GodzUrl As String = If(Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus", GodzModePlusURL, GodzModePublicURL)
+                Try
+                    ' HTTP version check via Last-Modified header (public GodzMode works;
+                    ' GodzModePlus over a private repo needs auth and will throw here).
+                    Dim GodzVersion As String = Await GetRemoteLastModifiedHeaderEpoch(GodzUrl)
+                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzVersion & "','flash-windows':'" & GodzUrl & "'}").Replace("'", Chr(34)))
+                Catch
+                    ' No remote (offline, or private repo without auth) -> fall back to a local SWF.
+                    Dim GodzSwf = ResolveGodzSwfPath()
+                    If GodzSwf = "" Then
+                        Throw New Exception("GodzMode: remote SWF unavailable and no local HabboAir.swf found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml.")
+                    End If
+                    Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
+                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
+                End Try
             End If
 
             IsClientUpdated = IsClientVersionExists()
@@ -1054,6 +1076,8 @@ End Try
             ClientType = "airplus"
         ElseIf Singleton.GetCurrentInstance().UpdateSource = "GodzMode" Then
             ClientType = "godz"
+        ElseIf Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus" Then
+            ClientType = "godzplus"
         End If
         Return Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads", ClientType, ClientVersion)
     End Function
@@ -1131,6 +1155,8 @@ End Try
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": AIR Plus"
             Case "GodzMode"
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": GodzMode"
+            Case "GodzModePlus"
+                ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": GodzModePlus"
             Case Else
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": Unknown"
         End Select
@@ -1144,6 +1170,8 @@ End Try
                 Return "AIR Plus"
             Case "GodzMode"
                 Return "GodzMode"
+            Case "GodzModePlus"
+                Return "GodzModePlus"
             Case Else
                 Return "Unknown"
         End Select
@@ -1154,16 +1182,16 @@ End Try
             Case "AIR_Official"
                 Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus"
             Case "AIR_Plus"
-                If ResolveGodzSwfPath() <> "" Then
-                    Singleton.GetCurrentInstance().UpdateSource = "GodzMode"
+                ' GodzMode fetches the public SWF over HTTP (no local build required).
+                Singleton.GetCurrentInstance().UpdateSource = "GodzMode"
+            Case "GodzMode"
+                If Singleton.GetCurrentInstance().GodzModePlusEnabled Then
+                    Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus"
                 Else
                     Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
-                    MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt),
-                           "GodzMode skipped: no local HabboAir.swf found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private")
-                    Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
-                    RefreshUpdateSourceText()
-                    Return
                 End If
+            Case "GodzModePlus"
+                Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
             Case Else
                 Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
         End Select
@@ -1434,11 +1462,11 @@ End Try
         If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
             ClientHint = AppTranslator.AirPlusClientHint(CurrentLanguageInt)
         ElseIf IsAirGodz() Then
+            Dim GodzUrl = If(Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus", GodzModePlusURL, GodzModePublicURL)
+            ClientHint = GetCurrentUpdateSourceName() & ": fetching SWF from " & GodzUrl
             Dim GodzSwf = ResolveGodzSwfPath()
-            If GodzSwf = "" Then
-                ClientHint = "GodzMode: local HabboAir.swf not found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml."
-            Else
-                ClientHint = "GodzMode: loading local SWF:" & Environment.NewLine & GodzSwf
+            If GodzSwf <> "" Then
+                ClientHint &= Environment.NewLine & "(local fallback available: " & GodzSwf & ")"
             End If
         End If
         MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), ClientHint)
