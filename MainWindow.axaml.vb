@@ -1000,21 +1000,30 @@ End Try
                 End Try
                 CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & AirPlusClientLatestVersion & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
             End If
-            If Singleton.GetCurrentInstance().UpdateSource = "GodzMode" OrElse Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus" Then
-                Dim GodzUrl As String = If(Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus", GodzModePlusURL, GodzModePublicURL)
+            If Singleton.GetCurrentInstance().UpdateSource = "GodzMode" Then
                 Try
-                    ' HTTP version check via Last-Modified header (public GodzMode works;
-                    ' GodzModePlus over a private repo needs auth and will throw here).
-                    Dim GodzVersion As String = Await GetRemoteLastModifiedHeaderEpoch(GodzUrl)
-                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzVersion & "','flash-windows':'" & GodzUrl & "'}").Replace("'", Chr(34)))
+                    ' Public SWF: HTTP version check via Last-Modified/x-ms-creation-time header.
+                    Dim GodzVersion As String = Await GetRemoteLastModifiedHeaderEpoch(GodzModePublicURL)
+                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzVersion & "','flash-windows':'" & GodzModePublicURL & "'}").Replace("'", Chr(34)))
                 Catch
-                    ' No remote (offline, or private repo without auth) -> fall back to a local SWF.
+                    ' Offline / no network -> fall back to a locally-built SWF.
                     Dim GodzSwf = ResolveGodzSwfPath()
                     If GodzSwf = "" Then
                         Throw New Exception("GodzMode: remote SWF unavailable and no local HabboAir.swf found. Build it first: cd habboAirPlusGodz && ./build.sh --init && ./build.sh --private. Or set GodzSwfPath in GlobalSettings.xml.")
                     End If
                     Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
                     CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
+                End Try
+            ElseIf Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus" Then
+                ' Private repo: first VERIFY the user can access the SWF. If the
+                ' private release is unreachable (no auth / not a collaborator),
+                ' GodzModePlus is not activated for this user -> show a clear error.
+                ' No local fallback: Plus is a gated feature, not a dev convenience.
+                Try
+                    Dim GodzVersion As String = Await GetRemoteLastModifiedHeaderEpoch(GodzModePlusURL)
+                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzVersion & "','flash-windows':'" & GodzModePlusURL & "'}").Replace("'", Chr(34)))
+                Catch
+                    Throw New Exception("GodzModePlus is not activated/available. Access to the private release repository (godzeth/HabboAirGodzModePlus) is required.")
                 End Try
             End If
 
