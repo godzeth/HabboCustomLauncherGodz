@@ -7,9 +7,10 @@ name: Release Launcher
 # Packaging per platform:
 #   Windows → raw .exe (double-click to run)
 #   Linux   → .tar.gz  (preserves the executable bit lost on browser download)
-#   macOS   → .app bundle inside .zip (right-click → Open to bypass
-#             Gatekeeper — the bundle is unsigned since codesign is not
-#             available on the Linux builder)
+#   macOS   → .app bundle inside .zip (users run `xattr -cr` to bypass
+#             Gatekeeper — the bundle is unsigned & non-notarized, since
+#             codesign/notarization is not available on the Linux builder and
+#             would require attaching an Apple Developer identity by design)
 #
 # Also runnable manually via workflow_dispatch for testing.
 
@@ -168,15 +169,29 @@ jobs:
           |---|---|---|
           | **Windows** (7+) | `HabboCustomLauncherGodz.exe` | Double-click to run. |
           | **Linux** (x64/arm64) | `HabboCustomLauncherGodz_Linux_*.tar.gz` | Extract, then run the binary inside. |
-          | **macOS** (Intel) | `HabboCustomLauncherGodz_OSX_x64.app.zip` | Unzip, then right-click the .app → **Open** → **Open anyway**. |
-          | **macOS** (Apple Silicon) | `HabboCustomLauncherGodz_OSX_arm64.app.zip` | Unzip, then right-click the .app → **Open** → **Open anyway**. |
+          | **macOS** (Intel) | `HabboCustomLauncherGodz_OSX_x64.app.zip` | Unzip, then run `xattr -cr` (see macOS note). |
+          | **macOS** (Apple Silicon) | `HabboCustomLauncherGodz_OSX_arm64.app.zip` | Unzip, then run `xattr -cr` (see macOS note). |
 
           ### macOS note
 
-          The app is not notarized (no Apple Developer certificate). On first launch:
+          The app is **not signed and not notarized** (by design — no Apple Developer
+          identity is attached, so distribution stays identity-free). As a result macOS
+          Gatekeeper will block the unzipped app as "damaged" or "from an unidentified
+          developer" on first launch.
+
+          **Reliable fix (all macOS versions, incl. Sonoma/Sequoia):**
+
           1. Unzip the downloaded `.app.zip`.
-          2. **Right-click** the `.app` → **Open**.
-          3. Click **Open anyway** in the dialog (or go to **System Settings → Privacy & Security** and click **Open Anyway**).
+          2. Open **Terminal** and run:
+             ```bash
+             xattr -cr "/path/to/HabboCustomLauncherGodz.app"
+             ```
+             (Tip: drag the `.app` onto the Terminal window to paste its path.)
+          3. Double-click the `.app` to launch it.
+
+          The "right-click → Open → Open anyway" path often **does not work** on
+          macOS 14+ (Sonoma/Sequoia), where unsigned apps are reported as "damaged"
+          with no Open button — use the `xattr -cr` command above instead.
           EOF
           )" \
               assets/*
