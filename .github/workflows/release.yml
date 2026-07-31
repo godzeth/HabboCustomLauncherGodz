@@ -1,10 +1,16 @@
 name: Release Launcher
 
 # On a version tag (v*), build self-contained single-file binaries for every
-# supported platform and publish them as release assets on THIS repo
-# (godzeth/HabboCustomLauncherGodz). Because we publish to the same repo the
-# workflow lives in, the built-in GITHUB_TOKEN is sufficient — no PAT needed
-# (unlike the SWF release.yml, which cross-publishes to other repos).
+# supported platform, package them for each OS convention, and publish them as
+# release assets on THIS repo (godzeth/HabboCustomLauncherGodz).
+#
+# Packaging per platform:
+#   Windows → raw .exe (double-click to run)
+#   Linux   → .tar.gz  (preserves the executable bit lost on browser download)
+#   macOS   → .app bundle inside .zip (right-click → Open to bypass
+#             Gatekeeper — the bundle is unsigned since codesign is not
+#             available on the Linux builder)
+#
 # Also runnable manually via workflow_dispatch for testing.
 
 on:
@@ -19,7 +25,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     # .NET cross-publishes every RID from a single Linux runner — no matrix of
-    # OS runners needed. Matrix is only to fan out the publish + rename per RID.
+    # OS runners needed. Matrix fans out the publish + package per RID.
     strategy:
       fail-fast: false
       matrix:
@@ -29,18 +35,23 @@ jobs:
           - rid: win-x86
             asset: HabboCustomLauncherGodz.exe
             binary: HabboCustomLauncher.exe      # OutputType=WinExe → .exe
+            package: none
           - rid: linux-x64
-            asset: HabboCustomLauncherGodz_Linux_x64
-            binary: HabboCustomLauncher           # no extension on Unix
+            asset: HabboCustomLauncherGodz_Linux_x64.tar.gz
+            binary: HabboCustomLauncher
+            package: targz
           - rid: linux-arm64
-            asset: HabboCustomLauncherGodz_Linux_arm64
+            asset: HabboCustomLauncherGodz_Linux_arm64.tar.gz
             binary: HabboCustomLauncher
+            package: targz
           - rid: osx-x64
-            asset: HabboCustomLauncherGodz_OSX_x64
+            asset: HabboCustomLauncherGodz_OSX_x64.app.zip
             binary: HabboCustomLauncher
+            package: app
           - rid: osx-arm64
-            asset: HabboCustomLauncherGodz_OSX_arm64
+            asset: HabboCustomLauncherGodz_OSX_arm64.app.zip
             binary: HabboCustomLauncher
+            package: app
     steps:
       - uses: actions/checkout@v4
 
@@ -60,17 +71,66 @@ jobs:
             -p:EnableCompressionInSingleFile=true \
             -o publish
 
-      - name: Stage Godz-branded asset
+      - name: Verify publish output
         run: |
-          # The single-file host binary is publish/<binary>. Rename to the
-          # Godz asset name and confirm it's a non-trivial file.
-          mv -f "publish/${{ matrix.binary }}" "${{ matrix.asset }}"
-          ls -lh "${{ matrix.asset }}"
-          sz=$(stat -c %s "${{ matrix.asset }}")
+          # Sanity-check the binary exists and is non-trivially sized.
+          sz=$(stat -c %s "publish/${{ matrix.binary }}")
           if [ "$sz" -lt 1000000 ]; then
-            echo "ERROR: ${{ matrix.asset }} is only $sz bytes — publish likely failed"
+            echo "ERROR: publish/${{ matrix.binary }} is only $sz bytes — publish likely failed"
             exit 1
           fi
+          echo "Binary OK: $sz bytes"
+
+      - name: Package — Windows (raw .exe)
+        if: matrix.package == 'none'
+        run: |
+          mv -f "publish/${{ matrix.binary }}" "${{ matrix.asset }}"
+          ls -lh "${{ matrix.asset }}"
+
+      - name: Package — Linux (.tar.gz preserving exec bit)
+        if: matrix.package == 'targz'
+        run: |
+          chmod +x "publish/${{ matrix.binary }}"
+          # Wrap in a directory named after the asset so extraction is clean.
+          dir_name="${{ matrix.asset }}"
+          dir_name="${dir_name%.tar.gz}"
+          mkdir -p "stage/$dir_name"
+          cp "publish/${{ matrix.binary }}" "stage/$dir_name/HabboCustomLauncherGodz"
+          chmod +x "stage/$dir_name/HabboCustomLauncherGodz"
+          tar czf "${{ matrix.asset }}" -C stage "$dir_name"
+          ls -lh "${{ matrix.asset }}"
+          echo "Contents:"
+          tar tzf "${{ matrix.asset }}"
+
+      - name: Package — macOS (.app bundle)
+        if: matrix.package == 'app'
+        run: |
+          APP_NAME="HabboCustomLauncherGodz"
+          APP_DIR="$APP_NAME.app"
+
+          # Build the .app directory structure.
+          mkdir -p "$APP_DIR/Contents/MacOS"
+          mkdir -p "$APP_DIR/Contents/Resources"
+
+          # Place the binary.
+          cp "publish/${{ matrix.binary }}" "$APP_DIR/Contents/MacOS/"
+          chmod +x "$APP_DIR/Contents/MacOS/${{ matrix.binary }}"
+
+          # Copy the icon.
+          cp "Assets/HabboCustomLauncherIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+
+          # Write Info.plist.
+          cp "Assets/Info.plist" "$APP_DIR/Contents/Info.plist"
+
+          # PkgInfo (8-byte signature — helps Finder identify the bundle).
+          printf 'APPL????' > "$APP_DIR/Contents/PkgInfo"
+
+          # Zip the bundle. -X strips extra file attributes that confuse
+          # macOS Archive Utility; -y preserves symlinks as-is.
+          zip -r -X -y "${{ matrix.asset }}" "$APP_DIR"
+          ls -lh "${{ matrix.asset }}"
+          echo "App bundle structure:"
+          find "$APP_DIR" -type f | sort
 
       - uses: actions/upload-artifact@v4
         with:
@@ -84,7 +144,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Download all platform binaries
+      - name: Download all platform packages
         uses: actions/download-artifact@v4
         with:
           path: assets
@@ -101,7 +161,24 @@ jobs:
           else
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --title "HabboCustomLauncherGodz $TAG" \
-              --notes "Self-contained single-file launcher builds for Windows, Linux, and macOS. See the launcher README for per-platform instructions." \
+              --notes "$(cat <<'EOF'
+          ## Downloads
+
+          | OS | Download | Instructions |
+          |---|---|---|
+          | **Windows** (7+) | `HabboCustomLauncherGodz.exe` | Double-click to run. |
+          | **Linux** (x64/arm64) | `HabboCustomLauncherGodz_Linux_*.tar.gz` | Extract, then run the binary inside. |
+          | **macOS** (Intel) | `HabboCustomLauncherGodz_OSX_x64.app.zip` | Unzip, then right-click the .app → **Open** → **Open anyway**. |
+          | **macOS** (Apple Silicon) | `HabboCustomLauncherGodz_OSX_arm64.app.zip` | Unzip, then right-click the .app → **Open** → **Open anyway**. |
+
+          ### macOS note
+
+          The app is not notarized (no Apple Developer certificate). On first launch:
+          1. Unzip the downloaded `.app.zip`.
+          2. **Right-click** the `.app` → **Open**.
+          3. Click **Open anyway** in the dialog (or go to **System Settings → Privacy & Security** and click **Open Anyway**).
+          EOF
+          )" \
               assets/*
           fi
           echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
