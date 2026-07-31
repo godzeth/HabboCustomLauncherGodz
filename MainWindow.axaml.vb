@@ -1333,7 +1333,7 @@ End Try
                 'Error while launching habbo profile url
             End Try
         Else
-            Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncher/releases/latest") With {.UseShellExecute = True})
+            Process.Start(New ProcessStartInfo("https://github.com/godzeth/HabboCustomLauncherGodz/releases/latest") With {.UseShellExecute = True})
         End If
     End Sub
 
