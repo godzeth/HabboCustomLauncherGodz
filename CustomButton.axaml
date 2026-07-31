@@ -5,7 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              Text=""
-             BackColor="#BC00A3"
+             BackColor="#5A5A5A"
 			 FontSize="13"
              Foreground="White"
              IsButtonCornered="True"
@@ -41,13 +41,13 @@
 				</Grid>
 			</Button.Content>
 			<Button.Background>
-				<SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}" Opacity="0.5"/>
+				<SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}" Opacity="0.7"/>
 			</Button.Background>
 			<Button.Styles>
 				<Style Selector="Button">
 					<Setter Property="Background">
 						<Setter.Value>
-							<SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}" Opacity="0.5" />
+							<SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}" Opacity="0.7" />
 						</Setter.Value>
 					</Setter>
 					<Setter Property="TextBlock.Foreground" Value="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=Foreground}" />
@@ -55,7 +55,7 @@
 				<Style Selector="Button:pointerover /template/ ContentPresenter">
 					<Setter Property="Background">
 						<Setter.Value>
-							<SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}"  Opacity="0.8" />
+							<SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}"  Opacity="1.0" />
 						</Setter.Value>
 					</Setter>
 					<Setter Property="TextBlock.Foreground" Value="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=Foreground}" />
@@ -74,7 +74,7 @@
 		<Grid ZIndex="1" IsVisible="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=IsButtonDisabled}">
 			<Border BorderThickness="1" CornerRadius="{Binding ElementName=InnerButton, Path=CornerRadius}">
 				<Border.Background>
-					<SolidColorBrush Color="Black" Opacity="0.5"/>
+					<SolidColorBrush Color="Black" Opacity="0.7"/>
 				</Border.Background>
 			</Border>
 		</Grid>

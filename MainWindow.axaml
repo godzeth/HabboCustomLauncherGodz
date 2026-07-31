@@ -13,9 +13,9 @@
 			<RowDefinition Height="32"/>
 			<RowDefinition Height="*"/>
 		</Grid.RowDefinitions>
-		<Label Name="TitleBarLabel" Grid.Row="0" Background="#A22A60" Foreground="White" Content="    HabboCustomLauncher" VerticalContentAlignment="Center"/>
+		<Label Name="TitleBarLabel" Grid.Row="0" Background="#1A1A1A" Foreground="White" Content="    HabboCustomLauncher" VerticalContentAlignment="Center"/>
 		<local:CustomButton x:Name="CloseButton" IsFocusable="False" Grid.Row="0" Foreground="White" HorizontalAlignment="Right" Width="50" FontSize="12" Icon="{StaticResource XIconGeometry}" BackColor="#78FF0000"/>
-		<Border Grid.Row="1" BorderThickness="1,0,1,1" BorderBrush="#A22A60">
+		<Border Grid.Row="1" BorderThickness="1,0,1,1" BorderBrush="#1A1A1A">
 			<Grid Grid.Row="0">
 				<Image Source="/Assets/modal-backdrop-pink.png"/>
 				<Grid>
@@ -39,24 +39,24 @@
 									<ColumnDefinition />
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
-								<local:CustomButton x:Name="LoginCodeButton" Grid.Row="0" Text="Clipboard login code not detected" BackColor="#3F3F3F" Height="40" IsButtonCornered="False"/>
-								<local:CustomButton IsButtonDisabled="False" x:Name="LoginCodeButton2" Grid.Column="1" Width="30" FontSize="15" Icon="{StaticResource ClipboardXIconGeometry}" BackColor="#3F3F3F" Margin="5,0,0,0"/>
+								<local:CustomButton x:Name="LoginCodeButton" Grid.Row="0" Text="Clipboard login code not detected" BackColor="#5A5A5A" Height="40" IsButtonCornered="False"/>
+								<local:CustomButton IsButtonDisabled="False" x:Name="LoginCodeButton2" Grid.Column="1" Width="30" FontSize="15" Icon="{StaticResource ClipboardXIconGeometry}" BackColor="#5A5A5A" Margin="5,0,0,0"/>
 							</Grid>
 							<Grid Grid.Row="1" Margin="0,0,0,10" Height="40">
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition />
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
-								<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton" Grid.Column="0" Text="Unknown client version" BackColor="#990084" />
-								<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton2" Grid.Column="1" Width="30" Icon="{StaticResource TrashCanIconGeometry}" BackColor="#990084" Margin="5,0,0,0"/>
+								<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton" Grid.Column="0" Text="Unknown client version" BackColor="#5A5A5A" />
+								<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton2" Grid.Column="1" Width="30" Icon="{StaticResource TrashCanIconGeometry}" BackColor="#5A5A5A" Margin="5,0,0,0"/>
 							</Grid>
 							<Grid Grid.Row="2" Margin="0,0,0,10" Height="40">
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition />
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
-								<local:CustomButton x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#990084" />
-								<local:CustomButton x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Width="30" Icon="{StaticResource QuestionIconGeometry}" BackColor="#990084" Margin="5,0,0,0"/>
+								<local:CustomButton x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#5A5A5A" />
+								<local:CustomButton x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Width="30" Icon="{StaticResource QuestionIconGeometry}" BackColor="#5A5A5A" Margin="5,0,0,0"/>
 							</Grid>
 						</Grid>
 					</Grid>
