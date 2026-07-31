@@ -524,9 +524,23 @@ Partial Public Class MainWindow : Inherits Window
                         Await Task.Delay(100)
                     Loop
                 Else
-                    ' Fallback: copy a locally-built SWF (offline, or private repo without auth).
-                    Dim GodzSwf = ResolveGodzSwfPath()
-                    If GodzSwf = "" Then
+                    ' Local SWF: use the URL value directly when it carries a local
+                    ' path (GODZ_LOCAL_SWF env var sends a plain path; the offline
+                    ' fallback sends a file:// URL). Fall back to ResolveGodzSwfPath()
+                    ' only when the URL has no usable local path.
+                    Dim GodzSwf As String = ""
+                    If GodzUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase) Then
+                        Try
+                            GodzSwf = (New Uri(GodzUrl)).LocalPath
+                        Catch
+                        End Try
+                    ElseIf Not String.IsNullOrWhiteSpace(GodzUrl) Then
+                        GodzSwf = GodzUrl
+                    End If
+                    If String.IsNullOrEmpty(GodzSwf) OrElse Not File.Exists(GodzSwf) Then
+                        GodzSwf = ResolveGodzSwfPath()
+                    End If
+                    If String.IsNullOrEmpty(GodzSwf) Then
                         Throw New Exception("GodzMode: SWF unavailable. Check your network connection or set GodzSwfPath in GlobalSettings.xml.")
                     End If
                     Await Task.Run(Sub() File.Copy(GodzSwf, ClientFilePath, True))
@@ -1001,19 +1015,28 @@ End Try
                 CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & AirPlusClientLatestVersion & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
             End If
             If Singleton.GetCurrentInstance().UpdateSource = "GodzMode" Then
-                Try
-                    ' Public SWF: HTTP version check via Last-Modified/x-ms-creation-time header.
-                    Dim GodzVersion As String = Await GetRemoteLastModifiedHeaderEpoch(GodzModePublicURL)
-                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzVersion & "','flash-windows':'" & GodzModePublicURL & "'}").Replace("'", Chr(34)))
-                Catch
-                    ' Offline / no network -> fall back to a locally-built SWF.
-                    Dim GodzSwf = ResolveGodzSwfPath()
-                    If GodzSwf = "" Then
-                        Throw New Exception("GodzMode: SWF unavailable. Check your network connection or set GodzSwfPath in GlobalSettings.xml.")
-                    End If
-                    Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
-                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
-                End Try
+                ' Dev override: GODZ_LOCAL_SWF env var forces a specific local SWF,
+                ' skipping the GitHub HTTP version check entirely. No UI surface —
+                ' this is a developer-only convenience (see dev.sh test).
+                Dim GodzLocalSwf = Environment.GetEnvironmentVariable("GODZ_LOCAL_SWF")
+                If Not String.IsNullOrWhiteSpace(GodzLocalSwf) AndAlso File.Exists(GodzLocalSwf) Then
+                    Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzLocalSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
+                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'" & GodzLocalSwf & "'}").Replace("'", Chr(34)))
+                Else
+                    Try
+                        ' Public SWF: HTTP version check via Last-Modified/x-ms-creation-time header.
+                        Dim GodzVersion As String = Await GetRemoteLastModifiedHeaderEpoch(GodzModePublicURL)
+                        CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzVersion & "','flash-windows':'" & GodzModePublicURL & "'}").Replace("'", Chr(34)))
+                    Catch
+                        ' Offline / no network -> fall back to a locally-built SWF.
+                        Dim GodzSwf = ResolveGodzSwfPath()
+                        If GodzSwf = "" Then
+                            Throw New Exception("GodzMode: SWF unavailable. Check your network connection or set GodzSwfPath in GlobalSettings.xml.")
+                        End If
+                        Dim GodzMtimeEpoch As String = CInt((New FileInfo(GodzSwf).LastWriteTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString()
+                        CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GodzMtimeEpoch & "','flash-windows':'file://" & GodzSwf & "'}").Replace("'", Chr(34)))
+                    End Try
+                End If
             ElseIf Singleton.GetCurrentInstance().UpdateSource = "GodzModePlus" Then
                 ' Private repo: first VERIFY the user can access the SWF. If the
                 ' private release is unreachable (no auth / not a collaborator),
