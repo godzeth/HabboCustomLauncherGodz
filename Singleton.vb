@@ -20,7 +20,7 @@ Public Class Singleton
     Private Declare Function GetDeviceCaps Lib "gdi32" (ByVal hdc As IntPtr, ByVal nIndex As Integer) As Integer
     Private Const LOGPIXELSX As Integer = 88
     ' ================================
-    Public UpdateSource As String = "AIR_Plus"
+    Public UpdateSource As String = "GodzMode"
     Public CustomWindowScale As Double = 1 '(1 = 100% or autohdpi for win7/8/8.1)
     Public ClientAirVersion As String = "latest" '(can be old for osx)
     Public ClientAirVersionUserSet As Boolean = False ' True once user explicitly chose via Settings or saved XML

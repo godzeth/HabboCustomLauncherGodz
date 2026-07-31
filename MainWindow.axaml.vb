@@ -276,7 +276,7 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Private Function DisplayLauncherVersionOnFooter() As String
-        FooterButton.BackColor = Color.Parse("#3FCC00B0")
+        FooterButton.BackColor = Color.Parse("#3F31A500")
         FooterButton.Text = "Launcher version " & LauncherVersion
         Return ""
     End Function
@@ -1202,7 +1202,7 @@ End Try
             Case "GodzModePlus"
                 Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
             Case Else
-                Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
+                Singleton.GetCurrentInstance().UpdateSource = "GodzMode"
         End Select
         Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
         RefreshUpdateSourceText()
